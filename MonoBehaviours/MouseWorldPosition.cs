@@ -12,7 +12,7 @@ public class MouseWorldPosition : MonoBehaviour
 
     private void Update()
     {
-        Debug.Log(GetPosition());
+        
     }
 
     public Vector3 GetPosition()

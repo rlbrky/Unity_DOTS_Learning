@@ -9,6 +9,12 @@ partial struct UnitMoverSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        UnitMoverJob unitMoverJob = new UnitMoverJob
+        {
+            deltaTime = SystemAPI.Time.DeltaTime,
+        };
+        unitMoverJob.ScheduleParallel();
+        /*
         //In order to cycle through the query we require a foreach because it returns a IEnumerable
         //Actual type is never written inside the query because while working with structs you deal with copies so doing it like this
         //wouldn't work and our transforms would never change LocalTransform localTransform in SystemAPI.Query<LocalTransform>()
@@ -37,6 +43,37 @@ partial struct UnitMoverSystem : ISystem
             physicsVelocity.ValueRW.Linear = moveDirection * unitMover.ValueRO.moveSpeed; //Because we are setting velocity directly we don't need to apply delta time because that will be handled by physics system itself.
             physicsVelocity.ValueRW.Angular = float3.zero; //There can still be collisions that could move our units rotation so we take a measure for that.
             //localTransform.ValueRW.Position += moveDirection * moveSpeed.ValueRO.value * SystemAPI.Time.DeltaTime;
-        }
+        }*/
     }
 }
+
+// This job is going to be used only in this script so writing it here is fine
+[BurstCompile]
+public partial struct UnitMoverJob : IJobEntity
+{
+    public float deltaTime;
+    
+    // ref keyword is c# for pointers so it will read-write in that, in keyword is for read only.
+    public void Execute(ref LocalTransform localTransform, in UnitMover unitMover, ref PhysicsVelocity physicsVelocity)
+    {
+        float3 moveDirection = unitMover.targetPosition - localTransform.Position;
+
+        float reachedTargetDistanceSq = 2f;
+        if (math.lengthsq(moveDirection) < reachedTargetDistanceSq)
+        {
+            //Reached target position
+            physicsVelocity.Linear = float3.zero;
+            physicsVelocity.Angular = float3.zero;
+            return;
+        }
+        moveDirection = math.normalize(moveDirection);
+            
+        //Smooth rotation change for units
+        localTransform.Rotation = math.slerp(localTransform.Rotation,
+            quaternion.LookRotation(moveDirection, math.up()),
+            deltaTime * unitMover.rotationSpeed);
+            
+        physicsVelocity.Linear = moveDirection * unitMover.moveSpeed;
+        physicsVelocity.Angular = float3.zero;
+    }
+} 
