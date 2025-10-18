@@ -1,7 +1,7 @@
 using Unity.Burst;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 partial struct ShootAttackSystem : ISystem
 {
@@ -11,19 +11,45 @@ partial struct ShootAttackSystem : ISystem
         EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
         
         foreach ((
-                     RefRO<LocalTransform> localTransform,
+                     RefRW<LocalTransform> localTransform,
                      RefRW<ShootAttack> shootAttack, 
-                     RefRO<Target> target) 
+                     RefRO<Target> target,
+                     RefRW<UnitMover> unitMover) 
                  in SystemAPI.Query<
-                     RefRO<LocalTransform>,
+                     RefRW<LocalTransform>,
                      RefRW<ShootAttack>, 
-                     RefRO<Target>>())
+                     RefRO<Target>,
+                     RefRW<UnitMover>>())
+                
         {
             if (target.ValueRO.targetEntity == Entity.Null)
             {
                 continue;
             }
+            
+            // Ensure that unit moves in range before shooting
+            LocalTransform targetTransform = SystemAPI.GetComponent<LocalTransform>(target.ValueRO.targetEntity);
 
+            if (math.distance(localTransform.ValueRO.Position, targetTransform.Position) >
+                shootAttack.ValueRO.attackDistance)
+            {
+                // Target is too far, move closer
+                unitMover.ValueRW.targetPosition = targetTransform.Position;
+                continue;
+            }
+            else
+            {
+                // Target is in range, stop moving and attack
+                unitMover.ValueRW.targetPosition = localTransform.ValueRO.Position;
+            }
+            
+            // Make the unit face its target while shooting
+            float3 aimDirection = targetTransform.Position - localTransform.ValueRO.Position;
+            aimDirection =  math.normalize(aimDirection);
+            
+            quaternion targetRotation = quaternion.LookRotation(aimDirection, math.up());
+            localTransform.ValueRW.Rotation = math.slerp(localTransform.ValueRO.Rotation, targetRotation, SystemAPI.Time.DeltaTime * unitMover.ValueRO.rotationSpeed);
+            
             shootAttack.ValueRW.timer -= SystemAPI.Time.DeltaTime;
             if (shootAttack.ValueRO.timer > 0f)
             {
@@ -31,10 +57,13 @@ partial struct ShootAttackSystem : ISystem
             }
             
             shootAttack.ValueRW.timer = shootAttack.ValueRO.timerMax;
-
+            
             Entity bulletEntity = state.EntityManager.Instantiate(entitiesReferences.bulletPrefabEntity);
-            // Start the bullet from this entity's position
-            SystemAPI.SetComponent(bulletEntity, LocalTransform.FromPosition(localTransform.ValueRO.Position)); 
+            // TransformPoint Converts the local position to global position
+            float3 bulletSpawnWorldPosition = localTransform.ValueRO.TransformPoint(shootAttack.ValueRO.bulletSpawnLocalPosition);
+            
+            // Start the bullet from this entity's position with the offset we gave.
+            SystemAPI.SetComponent(bulletEntity, LocalTransform.FromPosition(bulletSpawnWorldPosition)); 
             
             // Set bullets damage properly
             RefRW<Bullet> bulletBullet = SystemAPI.GetComponentRW<Bullet>(bulletEntity);
