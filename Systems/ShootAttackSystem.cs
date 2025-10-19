@@ -72,7 +72,10 @@ partial struct ShootAttackSystem : ISystem
             // Set bullets target from this units target
             RefRW<Target> bulletTarget = SystemAPI.GetComponentRW<Target>(bulletEntity);
             bulletTarget.ValueRW.targetEntity = target.ValueRO.targetEntity;
-            
+
+            shootAttack.ValueRW.onShoot.isTriggered = true; // Use an event to spawn our light for shooting
+            shootAttack.ValueRW.onShoot.shootFromPosition = bulletSpawnWorldPosition;
+
             /*RefRW<Health> targetHealth = SystemAPI.GetComponentRW<Health>(target.ValueRO.targetEntity);
             int damageAmount = 1;
             targetHealth.ValueRW.healthAmount -= damageAmount;*/

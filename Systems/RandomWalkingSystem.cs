@@ -41,8 +41,6 @@ partial struct RandomWalkingSystem : ISystem
                 // We are too far from the target, move closer
                 unitMover.ValueRW.targetPosition = randomWalking.ValueRO.targetPosition;
             }
-        }
-
-        
+        }   
     }
 }
