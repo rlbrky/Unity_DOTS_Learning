@@ -120,25 +120,26 @@ public class UnitSelectionManager : MonoBehaviour
             //Creating a persistent allocator requires you to destroy it so be careful when using that or you will cause memory leaks.
             //Temp allocator is disposed automatically at the end of frame.
             EntityManager entityManager = World.DefaultGameObjectInjectionWorld.EntityManager;
-            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<UnitMover, Selected>().Build(entityManager);
+            EntityQuery entityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<Selected>().WithPresent<MoveOverride>().Build(entityManager);
             
             NativeArray<Entity> entities = entityQuery.ToEntityArray(Allocator.Temp);
-            NativeArray<UnitMover> unitMoverArray = entityQuery.ToComponentDataArray<UnitMover>(Allocator.Temp);
+            NativeArray<MoveOverride> moveOverrideArray = entityQuery.ToComponentDataArray<MoveOverride>(Allocator.Temp);
             
             // Get our specified positions and put our units in a formation
             NativeArray<float3> movePositionArray =
                 GenerateMovePositionArrayOfTypeCircle(mouseWorldPosition, entities.Length);
             
-            for (int i = 0; i < unitMoverArray.Length; i++)
+            for (int i = 0; i < moveOverrideArray.Length; i++)
             {
-                UnitMover unitMover = unitMoverArray[i];
-                unitMover.targetPosition = movePositionArray[i]; // Place the unit to the specific position that is set to them.
+                MoveOverride moveOverride = moveOverrideArray[i];
+                moveOverride.targetPosition = movePositionArray[i]; // Place the unit to the specific position that is set to them.
                 // The above code works on the copy we made because we are working with structs so in order to actually change the data inside our component we need to find and change it like this.
                 //entityManager.SetComponentData(entities[i], unitMover);
                 //Another way to achieve the component data save would be
-                unitMoverArray[i] = unitMover;
+                moveOverrideArray[i] = moveOverride;
+                entityManager.SetComponentEnabled<MoveOverride>(entities[i], true);
             }
-            entityQuery.CopyFromComponentDataArray(unitMoverArray); //This will update all the data that matches the entity query we wrote above.
+            entityQuery.CopyFromComponentDataArray(moveOverrideArray); //This will update all the data that matches the entity query we wrote above.
         }
     }
 
